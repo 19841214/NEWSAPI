@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>News Reader - Audio & Dict</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F7F5F0; --surface: #FFFFFF;
+      --border: rgba(0,0,0,0.09); --border-md: rgba(0,0,0,0.15);
+      --text: #1A1915; --muted: #6B6860; --hint: #A09D96;
+      --accent: #C8502A; --accent-bg: #FAF0EB;
+      --info: #185FA5; --info-bg: #EBF3FC;
+      --pin-bg: #FEF3E2; --pin-txt: #854F0B; --zh-border: #C8502A;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #131210; --surface: #1E1C19;
+        --border: rgba(255,255,255,0.08); --border-md: rgba(255,255,255,0.14);
+        --text: #EDE9E2; --muted: #9A9790; --hint: #5C5A55;
+        --accent: #E07050; --accent-bg: #2A1A14;
+        --info: #5A9FE0; --info-bg: #0D1E30;
+        --pin-bg: #2A2010; --pin-txt: #EF9F27; --zh-border: #E07050;
+      }
+    }
+
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'DM Sans', sans-serif; line-height: 1.6;
+      min-height: 100vh; overflow-x: hidden;
+    }
+
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem; position: sticky; top: 0; z-index: 100;
+    }
+    .header-inner {
+      max-width: 860px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between; height: 64px;
+    }
+    .site-title { font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: var(--text); }
+    .site-title span { color: var(--accent); }
+    
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .stats-chip { font-size: 12px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; }
+    .refresh-btn {
+      background: var(--accent); color: white; border: none; border-radius: 8px;
+      padding: 6px 14px; font-size: 13px; cursor: pointer; transition: opacity 0.2s;
+    }
+
+    .toolbar-wrap {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem; position: sticky; top: 64px; z-index: 99;
+    }
+    .toolbar { max-width: 860px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+    .search-wrap { position: relative; flex: 1; }
+    .search-wrap input {
+      width: 100%; padding: 10px 12px 10px 38px;
+      border: 1px solid var(--border-md); border-radius: 10px;
+      background: var(--bg); color: var(--text); font-size: 14px; outline: none;
+    }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--hint); }
+
+    select {
+      padding: 10px 30px 10px 12px; border: 1px solid var(--border-md); border-radius: 10px;
+      background: var(--bg); color: var(--text); font-size: 14px; cursor: pointer; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+
+    main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; padding-bottom: 6rem; }
+    .cards { display: flex; flex-direction: column; gap: 16px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem;
+      transition: all 0.2s ease; animation: slideUp 0.4s ease both;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.05); border-color: var(--border-md); }
+    .card.pinned { border-left: 4px solid var(--accent); background: linear-gradient(to right, var(--pin-bg), var(--surface) 10%); }
+
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+    .pin-badge { background: var(--pin-txt); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-top: 4px; white-space: nowrap; }
+    .card-title { font-family: 'DM Serif Display', serif; font-size: 1.25rem; line-height: 1.3; margin: 0; }
+
+    .card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
+    .source-tag { background: var(--info-bg); color: var(--info); padding: 2px 8px; border-radius: 6px; font-weight: 500; }
+
+    .card-desc { font-size: 14px; color: var(--muted); margin-bottom: 15px; }
+    .card-zh {
+      background: var(--accent-bg); border-left: 3px solid var(--zh-border);
+      padding: 15px; border-radius: 0 8px 8px 0; margin-bottom: 15px;
+      font-size: 15px; display: none;
+    }
+    .card.expanded .card-zh { display: block; }
+
+    .card-footer { display: flex; flex-wrap: wrap; gap: 10px; }
+    .btn {
+      padding: 6px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+      font-family: inherit; transition: all 0.2s; border: 1px solid var(--border-md); background: none; color: var(--muted);
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn:hover { background: var(--bg); color: var(--text); border-color: var(--accent); }
+    .btn-primary { color: var(--info); border-color: var(--info); text-decoration: none; }
+    .card.expanded .btn-toggle { background: var(--accent); color: white; border-color: var(--accent); }
+
+    /* 單字互動特效 */
+    .dict-word {
+      cursor: pointer; position: relative;
+      background-image: linear-gradient(transparent 80%, rgba(200,80,42,0.3) 80%);
+      transition: background-color 0.2s; padding: 0 2px; border-radius: 3px;
+    }
+    .dict-word:hover, .dict-word:active { background-color: rgba(200,80,42,0.15); color: var(--accent); }
+
+    /* TTS 朗讀按鈕特效 */
+    .btn-tts.playing {
+      background: var(--info-bg); color: var(--info); border-color: var(--info);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(24, 95, 165, 0.3); }
+      70% { box-shadow: 0 0 0 6px rgba(24, 95, 165, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(24, 95, 165, 0); }
+    }
+
+    /* 浮動字典視窗 (Bottom Sheet) */
+    .dict-backdrop {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4); z-index: 999;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+      backdrop-filter: blur(2px);
+    }
+    .dict-backdrop.active { opacity: 1; pointer-events: auto; }
+    
+    .dict-modal {
+      position: fixed; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 860px;
+      background: var(--surface); border-radius: 20px 20px 0 0;
+      padding: 24px; z-index: 1000; box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+      transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .dict-modal.active { transform: translateY(0); }
+    .dict-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    .dict-title-area { display: flex; align-items: center; gap: 12px; }
+    .word-title { font-family: 'DM Serif Display', serif; font-size: 2rem; color: var(--accent); }
+    .word-audio-btn { 
+      background: var(--info-bg); color: var(--info); border: none; 
+      border-radius: 50%; width: 36px; height: 36px; font-size: 16px; 
+      cursor: pointer; display: flex; align-items: center; justify-content: center; 
+    }
+    .word-meaning { font-size: 1.1rem; line-height: 1.6; color: var(--text); min-height: 40px; }
+    .dict-close { background: none; border: none; font-size: 24px; color: var(--muted); cursor: pointer; padding: 4px; }
+
+    .state-box { text-align: center; padding: 4rem 1rem; color: var(--muted); }
+    .spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-box { background: #FFF5F5; color: #C53030; padding: 1.5rem; border-radius: 12px; border: 1px solid #FEB2B2; margin-bottom: 2rem; font-size: 14px; }
+    
+    @media (max-width: 600px) {
+      .toolbar { flex-wrap: wrap; }
+      .search-wrap { min-width: 100%; }
+      select { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="site-title">News<span>.</span>Reader</div>
+    <div class="header-right">
+      <span class="stats-chip" id="stats">Checking...</span>
+      <button class="refresh-btn" onclick="load()">刷新</button>
+    </div>
+  </div>
+</header>
+
+<div class="toolbar-wrap">
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search" placeholder="搜尋標題、摘要..." />
+    </div>
+    <select id="src-filter">
+      <option value="">所有來源</option>
+    </select>
+  </div>
+</div>
+
+<main>
+  <div id="err"></div>
+  <div id="area">
+    <div class="state-box"><div class="spinner"></div>正在讀取試算表...</div>
+  </div>
+</main>
+
+<!-- 字典浮動視窗 -->
+<div class="dict-backdrop" id="dict-backdrop" onclick="closeDict()"></div>
+<div class="dict-modal" id="dict-modal">
+  <div class="dict-header">
+    <div class="dict-title-area">
+      <div class="word-title" id="dict-word">Word</div>
+      <button class="word-audio-btn" onclick="speakCurrentWord()" title="播放發音">🔊</button>
+    </div>
+    <button class="dict-close" onclick="closeDict()">&times;</button>
+  </div>
+  <div class="word-meaning" id="dict-meaning">正在查詢翻譯...</div>
+</div>
+
+<script>
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT6qPxqq-E9iSPicE9FmzYfoPFC0TUUGPnyZ4pNRB4dfKmTXU1rzNRQpo1mehxtjnT9Tay1KlJmuO3N/pub?gid=0&single=true&output=csv';
+
+const PROXIES = [
+  u => u, 
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`, 
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, 
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}` 
+];
+
+let allData = [];
+let availableVoices = [];
+let currentTTSUtterance = null;
+let currentPlayingBtnId = null;
+let currentLookupWord = '';
+
+// 初始化語音庫 (確保取得最高品質語音)
+window.speechSynthesis.onvoiceschanged = () => {
+  availableVoices = window.speechSynthesis.getVoices();
+};
+
+function getBestVoice() {
+  if (!availableVoices.length) availableVoices = window.speechSynthesis.getVoices();
+  // 優先挑選 Google 官方的高音質發音、Apple Siri 引擎 (Samantha/Daniel) 或 Microsoft 自然語音
+  return availableVoices.find(v => v.name.includes('Google US English')) ||
+         availableVoices.find(v => v.name.includes('Google UK English')) ||
+         availableVoices.find(v => v.name.includes('Samantha')) ||
+         availableVoices.find(v => v.name.includes('Daniel')) ||
+         availableVoices.find(v => v.lang === 'en-US' || v.lang === 'en-GB') || 
+         availableVoices[0];
+}
+
+// 基礎跳脫字元 (給中文用)
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g, '<br>');
+}
+
+// 給 JS 字串用的跳脫
+function escForJS(str) {
+  if (!str) return '';
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, ' ');
+}
+
+// 進階跳脫 + 單字包裹 (給標題與英文摘要用)
+function escAndWrap(s) {
+  if (!s) return '';
+  // 1. 先處理基礎 HTML 溢出
+  let text = String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  
+  // 2. 將英文單字包裝成可點擊的 span (避開已經轉義的 HTML 實體如 &amp;)
+  let lines = text.split('\n');
+  let wrapped = lines.map(line => {
+    return line.replace(/&[a-z]+;|([a-zA-Z]+(?:'[a-zA-Z]+)?)/g, function(match, word) {
+      if (word && word.length > 1) { // 長度 > 1 避免單個字母也被包
+        let cleanWord = word.replace(/'/g, "\\'");
+        return `<span class="dict-word" onclick="lookupWord(event, '${cleanWord}')">${word}</span>`;
+      }
+      return match;
+    });
+  });
+  return wrapped.join('<br>');
+}
+
+function parseCSV(str) {
+  const arr = [];
+  let quote = false;
+  let row = 0, col = 0;
+
+  for (let c = 0; c < str.length; c++) {
+    let cc = str[c], nc = str[c+1];
+    arr[row] = arr[row] || [];
+    arr[row][col] = arr[row][col] || "";
+
+    if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
+    if (cc == '"') { quote = !quote; continue; }
+    if (cc == ',' && !quote) { ++col; continue; }
+    if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
+    if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+    if (cc == '\r' && !quote) { ++row; col = 0; continue; }
+    arr[row][col] += cc;
+  }
+  
+  const rows = arr.filter(r => r.length > 1 || (r.length === 1 && r[0] !== ""));
+  if (rows.length < 1) return [];
+
+  const headers = rows[0].map(h => h.toLowerCase().trim());
+  const idx = {
+    pin:    headers.findIndex(h => h.includes('pin') || h.includes('保留')),
+    date:   headers.findIndex(h => h.includes('date') || h.includes('日期')),
+    source: headers.findIndex(h => h.includes('source') || h.includes('來源')),
+    title:  headers.findIndex(h => h.includes('title') || h.includes('標題')),
+    desc:   headers.findIndex(h => h.includes('desc') || h.includes('摘要')),
+    url:    headers.findIndex(h => h.includes('url') || h.includes('連結')),
+    zh:     headers.findIndex(h => h.includes('zh') || h.includes('中文摘要') || h.includes('中文'))
+  };
+
+  return rows.slice(1).map(r => ({
+    pin:    idx.pin !== -1 ? (r[idx.pin] || "") : (r[0] || ""),
+    date:   idx.date !== -1 ? (r[idx.date] || "") : (r[1] || ""),
+    source: idx.source !== -1 ? (r[idx.source] || "") : (r[2] || ""),
+    title:  idx.title !== -1 ? (r[idx.title] || "") : (r[3] || ""),
+    desc:   idx.desc !== -1 ? (r[idx.desc] || "") : (r[4] || ""),
+    url:    idx.url !== -1 ? (r[idx.url] || "") : (r[5] || ""),
+    zh:     idx.zh !== -1 ? (r[idx.zh] || "") : (r[6] || "")
+  })).filter(item => item.title && item.title.trim() !== "");
+}
+
+function render(data) {
+  const area = document.getElementById('area');
+  const stats = document.getElementById('stats');
+
+  if (!data || data.length === 0) {
+    area.innerHTML = `<div class="state-box">🔍 找不到符合的新聞。</div>`;
+    stats.textContent = '0 筆';
+    return;
+  }
+
+  const list = [...data].sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0));
+  stats.textContent = `${list.length} 筆`;
+
+  area.innerHTML = `<div class="cards">` + list.map((r, i) => `
+    <div class="card ${r.pin ? 'pinned' : ''}" id="card-${i}">
+      <div class="card-header">
+        ${r.pin ? '<span class="pin-badge">置頂</span>' : ''}
+        <h2 class="card-title">${escAndWrap(r.title)}</h2>
+      </div>
+      <div class="card-meta">
+        ${r.source ? `<span class="source-tag">${esc(r.source)}</span>` : ''}
+        <span>${esc(r.date)}</span>
+      </div>
+      ${r.desc ? `<div class="card-desc">${escAndWrap(r.desc)}</div>` : ''}
+      ${r.zh ? `<div class="card-zh">${esc(r.zh)}</div>` : ''}
+      <div class="card-footer">
+        ${r.zh ? `<button class="btn btn-toggle" onclick="toggleZh(${i})">🌐 中文</button>` : ''}
+        ${r.desc ? `<button class="btn btn-tts" id="tts-btn-${i}" onclick="toggleArticleTTS('${escForJS(r.desc)}', 'tts-btn-${i}')">🔈 朗讀摘要</button>` : ''}
+        ${r.url ? `<a href="${esc(r.url)}" target="_blank" class="btn btn-primary">原文 ↗</a>` : ''}
+      </div>
+    </div>
+  `).join('') + `</div>`;
+}
+
+window.toggleZh = (i) => {
+  document.getElementById(`card-${i}`).classList.toggle('expanded');
+};
+
+/* --- 朗讀功能 (TTS) --- */
+function toggleArticleTTS(text, btnId) {
+  // 如果已經在念且按的是同一個按鈕 -> 停止
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    if (currentPlayingBtnId) {
+      const oldBtn = document.getElementById(currentPlayingBtnId);
+      if (oldBtn) { oldBtn.innerHTML = '🔈 朗讀摘要'; oldBtn.classList.remove('playing'); }
+    }
+    if (currentPlayingBtnId === btnId) {
+      currentPlayingBtnId = null;
+      return; 
+    }
+  }
+
+  // 設定新語音
+  currentTTSUtterance = new SpeechSynthesisUtterance(text);
+  const bestVoice = getBestVoice();
+  if (bestVoice) currentTTSUtterance.voice = bestVoice;
+  currentTTSUtterance.lang = 'en-US';
+  currentTTSUtterance.rate = 0.9; // 稍微放慢速度，聽得更清楚
+
+  // 播放結束時恢復按鈕狀態
+  currentTTSUtterance.onend = () => {
+    const btn = document.getElementById(btnId);
+    if (btn) { btn.innerHTML = '🔈 朗讀摘要'; btn.classList.remove('playing'); }
+    currentPlayingBtnId = null;
+  };
+
+  // 播放出錯時也恢復
+  currentTTSUtterance.onerror = currentTTSUtterance.onend;
+
+  const btn = document.getElementById(btnId);
+  btn.innerHTML = '⏹️ 停止朗讀';
+  btn.classList.add('playing');
+  currentPlayingBtnId = btnId;
+
+  window.speechSynthesis.speak(currentTTSUtterance);
+}
+
+function speakCurrentWord() {
+  if (!currentLookupWord) return;
+  const wordUtterance = new SpeechSynthesisUtterance(currentLookupWord);
+  const bestVoice = getBestVoice();
+  if (bestVoice) wordUtterance.voice = bestVoice;
+  wordUtterance.lang = 'en-US';
+  window.speechSynthesis.speak(wordUtterance);
+}
+
+/* --- 字典功能 --- */
+async function lookupWord(event, word) {
+  event.stopPropagation(); // 阻止事件冒泡
+  currentLookupWord = word;
+
+  // 停止目前正在念的文章
+  if (window.speechSynthesis.speaking && currentPlayingBtnId) {
+    document.getElementById(currentPlayingBtnId).click(); 
+  }
+
+  // 顯示 UI
+  document.getElementById('dict-word').textContent = word;
+  document.getElementById('dict-meaning').innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:2px;margin:10px 0;"></div>正在翻譯...';
+  document.getElementById('dict-backdrop').classList.add('active');
+  document.getElementById('dict-modal').classList.add('active');
+
+  // 點擊後馬上唸出單字
+  speakCurrentWord();
+
+  // 呼叫 Google 翻譯 API
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-TW&dt=t&q=${encodeURIComponent(word)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const translation = data[0][0][0];
+    
+    document.getElementById('dict-meaning').textContent = translation;
+  } catch (err) {
+    document.getElementById('dict-meaning').textContent = '翻譯載入失敗，請稍後再試 😢';
+  }
+}
+
+function closeDict() {
+  document.getElementById('dict-backdrop').classList.remove('active');
+  document.getElementById('dict-modal').classList.remove('active');
+}
+
+/* --- 搜尋與讀取 --- */
+function doFilter() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const src = document.getElementById('src-filter').value;
+  
+  const filtered = allData.filter(r => {
+    const matchText = !q || [r.title, r.desc, r.zh].some(s => s.toLowerCase().includes(q));
+    const matchSrc = !src || r.source === src;
+    return matchText && matchSrc;
+  });
+  render(filtered);
+}
+
+async function load() {
+  const errEl = document.getElementById('err');
+  const areaEl = document.getElementById('area');
+  errEl.innerHTML = ''; areaEl.innerHTML = '<div class="state-box"><div class="spinner"></div>正在讀取試算表...</div>';
+
+  let success = false;
+  for (const proxyFn of PROXIES) {
+    try {
+      const res = await fetch(proxyFn(SHEET_URL), { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rawResponse = await res.text();
+      if (rawResponse.trim().startsWith('<!DOCTYPE html')) throw new Error("抓到網頁而非 CSV");
+
+      allData = parseCSV(rawResponse);
+      if (allData.length === 0) throw new Error("無資料");
+
+      const sel = document.getElementById('src-filter');
+      const sources = [...new Set(allData.map(r => r.source).filter(Boolean))].sort();
+      sel.innerHTML = '<option value="">所有來源</option>' + sources.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+
+      render(allData);
+      success = true;
+      break; 
+    } catch (e) {
+      console.warn(`Attempt failed:`, e);
+    }
+  }
+
+  if (!success) {
+    errEl.innerHTML = `<div class="error-box"><strong>⚠️ 網路連線失敗</strong><br>請確認瀏覽器外掛沒有阻擋連線。</div>`;
+    areaEl.innerHTML = '';
+  }
+}
+
+document.getElementById('search').addEventListener('input', doFilter);
+document.getElementById('src-filter').addEventListener('change', doFilter);
+window.onload = load;
+</script>
+</body>
+</html>
